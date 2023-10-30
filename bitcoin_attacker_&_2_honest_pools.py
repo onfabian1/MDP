@@ -118,6 +118,8 @@ class BitcoinEclipseModel(BlockchainModel):
         att_up, green, att_down, blue, v_ag, v_ab, fork_green, fork_blue = self.dissect_state_NOtuple(state)
         action_type, group = action
         # Bad states
+        if action_type is self.Action.Illegal:
+            raise Exception("Bad State")
         if vacant_blocks(v_ag) < green or vacant_blocks(v_ab) < blue:
             raise Exception("Bad State")
         if sum_blocks(v_ag, att_up, green, blue):
