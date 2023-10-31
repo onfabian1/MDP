@@ -210,76 +210,86 @@ class BitcoinEclipseModel(BlockchainModel):
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
 
-            elif fork_blue is not self.Fork.Active and fork_green is self.Fork.Active and att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant = vacant_blocks(v_ag)
-                taken = self.max_fork - vacant
-                if att_up > green and vacant > (green + 1):
-                    next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Active,
-                                                    fork_blue)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_blue is not self.Fork.Active and fork_green is self.Fork.Active:
+                if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant = vacant_blocks(v_ag)
+                    taken = self.max_fork - vacant
+                    if att_up > green and vacant > (green + 1):
+                        next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Active,
+                                                        fork_blue)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, self.Fork.Active,
-                                                    self.Fork.Relevant)
-                    transitions.add(next_state, probability=(1 - self.WW - self.alpha))
+                        next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, self.Fork.Active,
+                                                        self.Fork.Relevant)
+                        transitions.add(next_state, probability=(1 - self.WW - self.alpha))
 
-                    next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken), v_ab, self.Fork.Relevant,
-                                                    fork_blue)
-                    transitions.add(next_state, probability=(self.gamma * self.WW))
+                        next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken), v_ab, self.Fork.Relevant,
+                                                        fork_blue)
+                        transitions.add(next_state, probability=(self.gamma * self.WW))
 
-                    next_state = self.combine_state(att_up, green+1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
-                                                    fork_blue)
-                    transitions.add(next_state, probability=((1-self.gamma) * self.WW))
+                        next_state = self.combine_state(att_up, green+1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
+                                                        fork_blue)
+                        transitions.add(next_state, probability=((1-self.gamma) * self.WW))
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
-            elif fork_green is not self.Fork.Active and fork_blue is self.Fork.Active and att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant = vacant_blocks(v_ab)
-                taken = self.max_fork - vacant
-                if att_down > blue and vacant > (blue + 1):
-                    next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Irrelevant,
-                                                    self.Fork.Active)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_green is not self.Fork.Active and fork_blue is self.Fork.Active:
+                if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant = vacant_blocks(v_ab)
+                    taken = self.max_fork - vacant
+                    if att_down > blue and vacant > (blue + 1):
+                        next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Irrelevant,
+                                                        self.Fork.Active)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up, green+1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
-                                                    self.Fork.Active)
-                    transitions.add(next_state, probability=self.WW)
+                        next_state = self.combine_state(att_up, green+1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
+                                                        self.Fork.Active)
+                        transitions.add(next_state, probability=self.WW)
 
-                    next_state = self.combine_state(att_up, green, att_down, blue+1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down, blue+1, v_ag, v_ab, fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
-                    next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken),
-                                                    fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken),
+                                                        fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
-            elif fork_green is self.Fork.Active and fork_blue is self.Fork.Active and att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant_b = vacant_blocks(v_ab)
-                taken_b = self.max_fork - vacant_b
-                vacant_g = vacant_blocks(v_ag)
-                taken_g = self.max_fork - vacant_g
-                #TODO: ask Roi how to separate the conditions about att_up > green and att_down > blue
-                if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
-                    next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab,
-                                                    self.Fork.Irrelevant,
-                                                    self.Fork.Active)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_green is self.Fork.Active and fork_blue is self.Fork.Active:
+                if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant_b = vacant_blocks(v_ab)
+                    taken_b = self.max_fork - vacant_b
+                    vacant_g = vacant_blocks(v_ag)
+                    taken_g = self.max_fork - vacant_g
+                    if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
+                        next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab,
+                                                        self.Fork.Irrelevant,
+                                                        self.Fork.Active)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken_g), v_ab,
-                                                    self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=(self.gamma * self.WW))
+                        next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken_g), v_ab,
+                                                        self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=(self.gamma * self.WW))
 
-                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
+                        next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
 
-                    next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
-                    next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
 
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+            else:
+                transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         elif action_type is self.Action.Wait and group is self.Group.Blue:
             if fork_green is not self.Fork.Active and fork_blue is not self.Fork.Active:
@@ -295,123 +305,91 @@ class BitcoinEclipseModel(BlockchainModel):
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
-            elif fork_green is not self.Fork.Active and fork_blue is self.Fork.Active and att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant = vacant_blocks(v_ab)
-                taken = self.max_fork - vacant
-                if att_down > blue and vacant > (blue + 1):
-                    next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, fork_green,
-                                                    self.Fork.Active)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_green is not self.Fork.Active and fork_blue is self.Fork.Active:
+                if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant = vacant_blocks(v_ab)
+                    taken = self.max_fork - vacant
+                    if att_down > blue and vacant > (blue + 1):
+                        next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, fork_green,
+                                                        self.Fork.Active)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
-                                                    self.Fork.Active)
-                    transitions.add(next_state, probability=self.WW)
+                        next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant,
+                                                        self.Fork.Active)
+                        transitions.add(next_state, probability=self.WW)
 
-                    next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken), fork_green,
-                                                    self.Fork.Relevant)
-                    transitions.add(next_state, probability=(self.gamma * (1 - self.alpha - self.WW)))
+                        next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken), fork_green,
+                                                        self.Fork.Relevant)
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.alpha - self.WW)))
 
-                    next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=((1-self.gamma) * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=((1-self.gamma) * (1 - self.WW - self.alpha)))
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
-            elif fork_green is self.Fork.Active and fork_blue is not self.Fork.Active and att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant = vacant_blocks(v_ag)
-                taken = self.max_fork
-                if att_up > green and vacant > (green + 1):
-                    next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, self.Fork.Active,
-                                                    self.Fork.Irrelevant)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_green is self.Fork.Active and fork_blue is not self.Fork.Active:
+                if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant = vacant_blocks(v_ag)
+                    taken = self.max_fork
+                    if att_up > green and vacant > (green + 1):
+                        next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, self.Fork.Active,
+                                                        self.Fork.Irrelevant)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, self.Fork.Active,
-                                                    self.Fork.Relevant)
-                    transitions.add(next_state, probability=(1 - self.alpha - self.WW))
+                        next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, self.Fork.Active,
+                                                        self.Fork.Relevant)
+                        transitions.add(next_state, probability=(1 - self.alpha - self.WW))
 
-                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=(self.gamma * self.WW))
+                        next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=(self.gamma * self.WW))
 
-                    next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken), v_ab,
-                                                    self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
+                        next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken), v_ab,
+                                                        self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
-            elif fork_green is self.Fork.Active and fork_blue is self.Fork.Active and att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
-                vacant_b = vacant_blocks(v_ab)
-                taken_b = self.max_fork - vacant_b
-                vacant_g = vacant_blocks(v_ag)
-                taken_g = self.max_fork - vacant_g
-                #TODO: ask Roi how to separate the conditions about att_up > green and att_down > blue
-                if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
-                    next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab,
-                                                    self.Fork.Active,
-                                                    self.Fork.Irrelevant)
-                    transitions.add(next_state, probability=self.alpha)
+            elif fork_green is self.Fork.Active and fork_blue is self.Fork.Active:
+                if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
+                    vacant_b = vacant_blocks(v_ab)
+                    taken_b = self.max_fork - vacant_b
+                    vacant_g = vacant_blocks(v_ag)
+                    taken_g = self.max_fork - vacant_g
+                    #TODO: ask Roi how to separate the conditions about att_up > green and att_down > blue
+                    if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
+                        next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab,
+                                                        self.Fork.Active,
+                                                        self.Fork.Irrelevant)
+                        transitions.add(next_state, probability=self.alpha)
 
-                    next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken_g), v_ab,
-                                                    self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=(self.gamma * self.WW))
+                        next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken_g), v_ab,
+                                                        self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=(self.gamma * self.WW))
 
-                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
-                    transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
+                        next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
+                        transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
 
-                    next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
-                    next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
-                    transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
 
+                    else:
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+            else:
+                transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         return transitions
 
-    #TODO: ask Roi if this functions are relevant?
     def get_honest_revenue(self) -> float:
         return (self.alpha/(1-self.WW))
-
-    # def is_policy_honest(self, policy: BlockchainModel.Policy) -> bool:
-    #    return policy[self.state_space.element_to_index((0, 0, self.Fork.Irrelevant))] == self.Action.Wait \
-    #           and policy[self.state_space.element_to_index((1, 0, self.Fork.Irrelevant))] == self.Action.Override \
-    #           and policy[self.state_space.element_to_index((0, 1, self.Fork.Irrelevant))] == self.Action.Adopt \
-    #           and policy[self.state_space.element_to_index((0, 1, self.Fork.Relevant))] == self.Action.Adopt
-
-    # def build_honest_policy(self) -> BlockchainModel.Policy:
-    #     policy = np.zeros(self.state_space.size, dtype=int)
-    #
-    #     for i in range(self.state_space.size):
-    #         a, h, be, v, fork = self.state_space.index_to_element(i)
-    #
-    #         if h > a:
-    #             action = self.Action.Adopt
-    #         elif a > h:
-    #             action = self.Action.Override
-    #         else:
-    #             action = self.Action.Wait
-    #
-    #         policy[i] = action
-    #
-    #     return tuple(policy)
-
-    # def build_sm1_policy(self) -> BlockchainModel.Policy:
-    #     policy = np.zeros(self.state_space.size, dtype=int)
-    #
-    #     for i in range(self.state_space.size):
-    #         a, h, be, v, fork = self.state_space.index_to_element(i)
-    #
-    #         if h > a:
-    #             action = self.Action.Adopt
-    #         elif (h == a - 1 and a >= 2) or a == self.max_fork:
-    #             action = self.Action.Override
-    #         elif (h == 1 and a == 1) and fork is self.Fork.Relevant:
-    #             action = self.Action.Match
-    #         else:
-    #             action = self.Action.Wait
-    #
-    #         policy[i] = action
-    #
-    #     return tuple(policy)
 
 
 if __name__ == '__main__':
