@@ -37,8 +37,6 @@ class BitcoinEclipseModel(BlockchainModel):
     @staticmethod
     def copy_vector(vector_a, max_idx_a, max_idx_b):
       return vector_a[max_idx_b:max_idx_a]
-      #  for i in range(max_idx + 1):
-      #      vector_a[i] = vector_b[i]
 
     # Calculate the reward for a given vector
     def calc_reward(self, vector, max_idx):
@@ -48,6 +46,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 count_1 += 1
         return count_1
 
+    # odd index = owner. even index = status
     def taken_blocks(self, vector):
         count_2 = 0
         for i in range(self.max_fork):
@@ -62,14 +61,15 @@ class BitcoinEclipseModel(BlockchainModel):
                 count_3 += 1
         return count_3
 
-    def sum_blocks(self, vector, att, green, blue):
+    # checks if there's any vacant blocks that are with false 'On' status
+    def false_taken(self, vector, att, group):
         flag = False
         for i in range(self.max_fork):
-            if vector[att + green + 2*i] == self.BlockStatus.On or vector[att + blue + 2*i] == self.BlockStatus.On:
+            if vector[att + group + 2*i] == self.BlockStatus.On:
                 flag = True
         return flag
 
-    def final_v(self): #TODO: ask roi
+    def final_v(self):
         return (-1,) * self.max_fork
 
     def __repr__(self) -> str:
@@ -122,7 +122,7 @@ class BitcoinEclipseModel(BlockchainModel):
             raise Exception("Bad State")
         if vacant_blocks(v_ag) < green or vacant_blocks(v_ab) < blue:
             raise Exception("Bad State")
-        if sum_blocks(v_ag, att_up, green, blue):
+        if false_taken(v_ag, att_up, green) or false_taken(v_ab, att_down, blue):
             raise Exception("Bad State")
 
         if action_type is self.Action.Adopt and group is self.Group.Green:
@@ -195,6 +195,13 @@ class BitcoinEclipseModel(BlockchainModel):
             else:
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
+        elif action_type is self.Action.Switch:
+            if (taken_blocks(v_ag) == 0) and (taken_blocks(v_ab) == 0):
+                next_state = self.combine_state(att_up, green, att_down, blue, v_ag, v_ab, fork_green, fork_blue)
+                transitions.add(next_state, probability=1)
+            else:
+                transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+
         elif action_type is self.Action.Wait and group is self.Group.Green:
             if fork_green is not self.Fork.Active and fork_blue is not self.Fork.Active:
                 if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
@@ -249,11 +256,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=self.WW)
 
                         next_state = self.combine_state(att_up, green, att_down, blue+1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
 
                         next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken),
                                                         fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
                     else:
                         transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
@@ -279,10 +286,10 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
 
                         next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
 
                         next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
                         transitions.add(self.final_state, probability=1, reward=self.error_penalty)
@@ -300,7 +307,7 @@ class BitcoinEclipseModel(BlockchainModel):
                     next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
                     transitions.add(next_state, probability=(1- self.WW - self.alpha))
 
-                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, fork_green, self.Fork.Relevant)
+                    next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
                     transitions.add(next_state, probability=self.WW)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
@@ -343,11 +350,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(1 - self.alpha - self.WW))
 
                         next_state = self.combine_state(att_up, green + 1, att_down, blue, v_ag, v_ab, self.Fork.Relevant, fork_blue)
-                        transitions.add(next_state, probability=(self.gamma * self.WW))
+                        transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
 
                         next_state = self.combine_state(att_up - green, 1, att_down, blue, self.set_block_status(v_ag, green, self.Miner.Attacker, taken), v_ab,
                                                         self.Fork.Relevant, fork_blue)
-                        transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
+                        transitions.add(next_state, probability=(self.gamma * self.WW))
                     else:
                         transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
@@ -359,7 +366,6 @@ class BitcoinEclipseModel(BlockchainModel):
                     taken_b = self.max_fork - vacant_b
                     vacant_g = vacant_blocks(v_ag)
                     taken_g = self.max_fork - vacant_g
-                    #TODO: ask Roi how to separate the conditions about att_up > green and att_down > blue
                     if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
                         next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab,
                                                         self.Fork.Active,
@@ -374,10 +380,10 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=((1 - self.gamma) * self.WW))
 
                         next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
 
                         next_state = self.combine_state(att_up, green, att_down - blue, 1, v_ag, self.set_block_status(v_ab, blue, self.Miner.Attacker, taken_b), fork_green, self.Fork.Relevant)
-                        transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
+                        transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
                         transitions.add(self.final_state, probability=1, reward=self.error_penalty)
