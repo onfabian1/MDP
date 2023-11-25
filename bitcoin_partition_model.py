@@ -62,11 +62,12 @@ class BitcoinEclipseModel(BlockchainModel):
         return count_3
 
     # checks if there's any vacant blocks that are with false 'On' status
-    def false_taken(self, vector, att, group):
+    def check_enough_vacant_blocks(self, vector, att, group):
         flag = False
         for i in range(self.max_fork):
-            if vector[att + group + 2*i] == self.BlockStatus.On:
-                flag = True
+            if (att + group + 2*i) < 2*self.max_fork:
+                if vector[att + group + 2*i] == self.BlockStatus.On:
+                    flag = True
         return flag
 
     def final_v(self):
@@ -119,10 +120,10 @@ class BitcoinEclipseModel(BlockchainModel):
         action_type, group = action
         # Bad states
         if action_type is self.Action.Illegal:
-            raise Exception("Bad State")
+            transitions.add(self.final_state, probability=1, reward=self.error_penalty/2)
         if vacant_blocks(v_ag) < green or vacant_blocks(v_ab) < blue:
             raise Exception("Bad State")
-        if false_taken(v_ag, att_up, green) or false_taken(v_ab, att_down, blue):
+        if check_enough_vacant_blocks(v_ag, att_up, green) or check_enough_vacant_blocks(v_ab, att_down, blue):
             raise Exception("Bad State")
 
         if action_type is self.Action.Adopt and group is self.Group.Green:
@@ -197,7 +198,7 @@ class BitcoinEclipseModel(BlockchainModel):
 
         elif action_type is self.Action.Switch:
             if (taken_blocks(v_ag) == 0) and (taken_blocks(v_ab) == 0):
-                next_state = self.combine_state(att_up, green, att_down, blue, v_ag, v_ab, fork_green, fork_blue)
+                next_state = self.combine_state(att_down, green, att_up, blue, v_ag, v_ab, fork_green, fork_blue)
                 transitions.add(next_state, probability=1)
             else:
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
@@ -292,11 +293,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
-                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                        raise Exception("Bad State")
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
             else:
-                transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                raise Exception("Bad State")
 
         elif action_type is self.Action.Wait and group is self.Group.Blue:
             if fork_green is not self.Fork.Active and fork_blue is not self.Fork.Active:
@@ -330,9 +331,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(self.gamma * (1 - self.alpha - self.WW)))
 
                         next_state = self.combine_state(att_up, green, att_down, blue + 1, v_ag, v_ab, fork_green, self.Fork.Relevant)
+
                         transitions.add(next_state, probability=((1-self.gamma) * (1 - self.WW - self.alpha)))
+
                     else:
-                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                        raise Exception("Bad State")
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
@@ -356,7 +359,7 @@ class BitcoinEclipseModel(BlockchainModel):
                                                         self.Fork.Relevant, fork_blue)
                         transitions.add(next_state, probability=(self.gamma * self.WW))
                     else:
-                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                        raise Exception("Bad State")
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
@@ -386,11 +389,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
-                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                        raise Exception("Bad State")
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
             else:
-                transitions.add(self.final_state, probability=1, reward=self.error_penalty)
+                raise Exception("Bad State")
 
         return transitions
 
