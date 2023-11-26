@@ -19,6 +19,7 @@ class BitcoinEclipseModel(BlockchainModel):
         self.gamma = gamma
         self.WW = WW
         self.max_fork = max_fork
+        self.switch_flag = 0 # 0 = not taken
 
         self.Fork = self.create_int_enum('Fork', ['Irrelevant', 'Relevant', 'Active'])
         self.Action = self.create_int_enum('Action',
@@ -120,6 +121,7 @@ class BitcoinEclipseModel(BlockchainModel):
             transitions.add(self.final_state, probability=1)
             return transitions
 
+
         att_up, green, att_down, blue, v_ag, v_ab, fork_green, fork_blue = self.dissect_state_NOtuple(state)
         action_type, group = action
         # Bad states
@@ -132,6 +134,7 @@ class BitcoinEclipseModel(BlockchainModel):
 
         if action_type is self.Action.Adopt and group is self.Group.Green:
             taken = taken_blocks(v_ag)
+            self.switch_flag = 0
             if green > 0:
                 next_state = self.combine_state(0, 0, att_down, blue, self.set_block_status(v_ag, green,
                                                                                             self.Miner.Honest, taken)
@@ -142,6 +145,7 @@ class BitcoinEclipseModel(BlockchainModel):
 
         elif action_type is self.Action.Adopt and group is self.Group.Blue:
             taken = taken_blocks(v_ab)
+            self.switch_flag = 0
             if blue > 0:
                 next_state = self.combine_state(att_up, green, 0, 0, v_ag,
                                                 self.set_block_status(v_ab, blue, self.Miner.Honest, taken), fork_green,
@@ -152,6 +156,7 @@ class BitcoinEclipseModel(BlockchainModel):
 
         elif action_type is self.Action.Override and group is self.Group.Green:
             taken = taken_blocks(v_ag)
+            self.switch_flag = 0
             if att_up > green and (self.max_fork - taken) >= (green + 1):
                 next_state = self.combine_state(att_up - green - 1, 0, att_down, blue,
                                                 self.set_block_status(v_ag, green + 1, self.Miner.Attacker, taken),
@@ -163,6 +168,7 @@ class BitcoinEclipseModel(BlockchainModel):
 
         elif action_type is self.Action.Override and group is self.Group.Blue:
             taken = taken_blocks(v_ab)
+            self.switch_flag = 0
             if att_down > blue and (self.max_fork - taken) >= (blue + 1):
                 next_state = self.combine_state(att_up, green, att_down - blue - 1, 0, v_ag,
                                                 self.set_block_status(v_ab, blue + 1, self.Miner.Attacker, taken),
@@ -174,6 +180,7 @@ class BitcoinEclipseModel(BlockchainModel):
         elif action_type is self.Action.Reveal and group is self.Group.Green:
             taken_b = taken_blocks(v_ab)
             taken_g = taken_blocks(v_ag)
+            self.switch_flag = 0
             if taken_g > taken_b:
                 next_state = self.combine_state(att_up, green, 0, 0, self.copy_vector(v_ag, taken_g, taken_b + 1),
                                                 self.initializeVector(), fork_green, self.Fork.Irrelevant)
@@ -185,7 +192,8 @@ class BitcoinEclipseModel(BlockchainModel):
         elif action_type is self.Action.Reveal and group is self.Group.Blue:
             taken_b = taken_blocks(v_ab)
             taken_g = taken_blocks(v_ag)
-            if (taken_g) < (taken_b):
+            self.switch_flag = 0
+            if taken_g < taken_b:
                 next_state = self.combine_state(0, 0, att_down, blue, self.initializeVector(),
                                                 self.copy_vector(v_ab, v_ag, taken_b), self.Fork.Irrelevant, fork_blue)
                 reward_attacker = self.calc_reward(v_ab, taken_g)
@@ -195,6 +203,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         elif action_type is self.Action.Match and group is self.Group.Green:
+            self.switch_flag = 0
             if self.max_fork > att_up >= green > 0 and fork_green is self.Fork.Relevant:
                 next_state = self.combine_state(att_up, green, att_down, blue, v_ag, v_ab, self.Fork.Active, fork_blue)
                 transitions.add(next_state, probability=1)
@@ -202,6 +211,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         elif action_type is self.Action.Match and group is self.Group.Blue:
+            self.switch_flag = 0
             if self.max_fork > att_down >= blue > 0 and fork_blue is self.Fork.Relevant:
                 next_state = self.combine_state(att_up, green, att_down, blue, v_ag, v_ab, fork_green, self.Fork.Active)
                 transitions.add(next_state, probability=1)
@@ -209,13 +219,18 @@ class BitcoinEclipseModel(BlockchainModel):
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         elif action_type is self.Action.Switch:
-            if (taken_blocks(v_ag) == 0) and (taken_blocks(v_ab) == 0):
-                next_state = self.combine_state(att_down, green, att_up, blue, v_ag, v_ab, fork_green, fork_blue)
-                transitions.add(next_state, probability=1)
+            if (taken_blocks(v_ag) == 0) and (taken_blocks(v_ab) == 0) and (att_up > 0 or att_down > 0) and switch_flag:
+                self.switch_flag += 1
+                if switch_flag < 2:
+                    next_state = self.combine_state(att_down, green, att_up, blue, v_ag, v_ab, fork_green, fork_blue)
+                    transitions.add(next_state, probability=1)
+                else:
+                    transitions.add(self.final_state, probability=1, reward=self.error_penalty/2)
             else:
                 transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         elif action_type is self.Action.Wait and group is self.Group.Green:
+            self.switch_flag = 0
             if fork_green is not self.Fork.Active and fork_blue is not self.Fork.Active:
                 if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Irrelevant,
@@ -237,8 +252,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     vacant = vacant_blocks(v_ag)
                     taken = self.max_fork - vacant
-                    # if att_up > green and vacant > (green + 1):
-                    if att_up >= green and vacant > green:
+                    if att_up >= green and vacant >= green:
                         next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab, self.Fork.Active,
                                                         fork_blue)
                         transitions.add(next_state, probability=self.alpha)
@@ -266,8 +280,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 if att_up < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     vacant = vacant_blocks(v_ab)
                     taken = self.max_fork - vacant
-                    # if att_down > blue and vacant > (blue + 1):
-                    if att_down >= blue and vacant > blue:
+                    if att_down >= blue and vacant >= blue:
                         next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab,
                                                         self.Fork.Irrelevant,
                                                         self.Fork.Active)
@@ -297,7 +310,7 @@ class BitcoinEclipseModel(BlockchainModel):
                     taken_b = self.max_fork - vacant_b
                     vacant_g = vacant_blocks(v_ag)
                     taken_g = self.max_fork - vacant_g
-                    if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
+                    if att_down >= blue and vacant_b >= blue and att_up >= green and vacant_g >= green:
                         next_state = self.combine_state(att_up + 1, green, att_down, blue, v_ag, v_ab,
                                                         self.Fork.Irrelevant,
                                                         self.Fork.Active)
@@ -323,13 +336,14 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
-                        raise Exception("Bad State")
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
             else:
-                raise Exception("Bad State")
+                raise Exception("No other possibility for Wait Action")
 
         elif action_type is self.Action.Wait and group is self.Group.Blue:
+            self.switch_flag = 0
             if fork_green is not self.Fork.Active and fork_blue is not self.Fork.Active:
                 if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, fork_green,
@@ -350,7 +364,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     vacant = vacant_blocks(v_ab)
                     taken = self.max_fork - vacant
-                    if att_down > blue and vacant > (blue + 1):
+                    if att_down >= blue and vacant >= blue:
                         next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, fork_green,
                                                         self.Fork.Active)
                         transitions.add(next_state, probability=self.alpha)
@@ -370,9 +384,8 @@ class BitcoinEclipseModel(BlockchainModel):
                                                         self.Fork.Relevant)
 
                         transitions.add(next_state, probability=((1 - self.gamma) * (1 - self.WW - self.alpha)))
-
                     else:
-                        raise Exception("Bad State")
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
@@ -380,7 +393,7 @@ class BitcoinEclipseModel(BlockchainModel):
                 if att_down < self.max_fork and green < self.max_fork and blue < self.max_fork:
                     vacant = vacant_blocks(v_ag)
                     taken = self.max_fork
-                    if att_up > green and vacant > (green + 1):
+                    if att_up >= green and vacant >= green:
                         next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab, self.Fork.Active,
                                                         self.Fork.Irrelevant)
                         transitions.add(next_state, probability=self.alpha)
@@ -399,7 +412,7 @@ class BitcoinEclipseModel(BlockchainModel):
                                                         self.Fork.Relevant, fork_blue)
                         transitions.add(next_state, probability=(self.gamma * self.WW))
                     else:
-                        raise Exception("Bad State")
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
@@ -409,7 +422,7 @@ class BitcoinEclipseModel(BlockchainModel):
                     taken_b = self.max_fork - vacant_b
                     vacant_g = vacant_blocks(v_ag)
                     taken_g = self.max_fork - vacant_g
-                    if att_down > blue and vacant_b > (blue + 1) and att_up > green and vacant_g > (green + 1):
+                    if att_down >= blue and vacant_b >= blue and att_up >= green and vacant_g >= green:
                         next_state = self.combine_state(att_up, green, att_down + 1, blue, v_ag, v_ab,
                                                         self.Fork.Active,
                                                         self.Fork.Irrelevant)
@@ -435,11 +448,11 @@ class BitcoinEclipseModel(BlockchainModel):
                         transitions.add(next_state, probability=(self.gamma * (1 - self.WW - self.alpha)))
 
                     else:
-                        raise Exception("Bad State")
+                        transitions.add(self.final_state, probability=1, reward=self.error_penalty)
                 else:
                     transitions.add(self.final_state, probability=1, reward=self.error_penalty)
             else:
-                raise Exception("Bad State")
+                raise Exception("No other possibility for Wait Action")
 
         return transitions
 
@@ -453,5 +466,7 @@ if __name__ == '__main__':
 
     mdp = BitcoinEclipseModel(0.35, 0.3, 0.5, 100)
     print(mdp.state_space.size)
-    # p = mdp.build_sm1_policy()
-    # print(p[:10])
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    p = mdp.build_sm1_policy()
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(p[:10])
