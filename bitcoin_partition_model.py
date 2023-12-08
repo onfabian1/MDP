@@ -128,9 +128,9 @@ class BitcoinEclipseModel(BlockchainModel):
         if action_type is self.Action.Illegal:
             transitions.add(self.final_state, probability=1, reward=self.error_penalty / 2)
         if vacant_blocks(v_ag) < green or vacant_blocks(v_ab) < blue:
-            raise Exception("Bad State")
+            transitions.add(self.final_state, probability=1, reward=self.error_penalty)
         if check_enough_vacant_blocks(v_ag, att_up, green) or check_enough_vacant_blocks(v_ab, att_down, blue):
-            raise Exception("Bad State")
+            transitions.add(self.final_state, probability=1, reward=self.error_penalty)
 
         if action_type is self.Action.Adopt and group is self.Group.Green:
             taken = taken_blocks(v_ag)
@@ -466,7 +466,5 @@ if __name__ == '__main__':
 
     mdp = BitcoinEclipseModel(0.35, 0.3, 0.5, 100)
     print(mdp.state_space.size)
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    p = mdp.build_sm1_policy()
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print(p[:10])
+    # p = mdp.build_sm1_policy()
+    # print(mdp[:10])
